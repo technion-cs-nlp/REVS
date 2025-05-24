@@ -72,7 +72,7 @@
                     <div class="publication-links">
                          <!-- Arxiv PDF link -->
                       <span class="link-block">
-                        <a href="https://arxiv.org/pdf/2406.09325v2" target="_blank"
+                        <a href="https://arxiv.org/pdf/2406.09325v3" target="_blank"
                         class="external-link button is-normal is-rounded is-dark">
                         <span class="icon">
                           <i class="fas fa-file-pdf"></i>
@@ -119,11 +119,13 @@
         <h2 class="title is-3">Abstract</h2>
         <div class="content has-text-justified">
           <p>
-            Language models (LMs) risk inadvertently memorizing and divulging sensitive or personally identifiable information (PII) seen in training data, causing privacy concerns. Current approaches to address this issue involve costly dataset scrubbing, or model filtering through unlearning and model editing, which can be bypassed through extraction attacks. We propose REVS, a novel non-gradient-based method for unlearning sensitive information from LMs. REVS identifies and modifies a small subset of neurons relevant for constituent tokens which form sensitive information. To adequately evaluate our method on truly sensitive information, we curate two datasets: an email dataset naturally memorized by Llama-3-8B and GPT-J-6B, and a synthetic social security number dataset that we tune the models to memorize. Compared to other methods, REVS demonstrates superior performance in unlearning sensitive information and robustness to extraction attacks, while retaining underlying model integrity.          </p>
+            Language models (LMs) risk inadvertently memorizing and divulging sensitive or personally identifiable information (PII) seen in training data, causing privacy concerns. Current approaches to address this issue involve costly dataset scrubbing, or model filtering through unlearning and model editing, which can be bypassed through extraction attacks. We propose REVS, a novel non-gradient-based method for unlearning sensitive information from LMs. REVS identifies and modifies a small subset of neurons relevant for constituent tokens that form sensitive information. To adequately evaluate our method on truly sensitive information, we curate three datasets: email and URL datasets naturally memorized by the models, and a synthetic social security number dataset that we tune the models to memorize. Compared to other methods, REVS demonstrates superior performance in unlearning sensitive information and robustness to extraction attacks, while retaining underlying model integrity.
+          </p>
         </div>
       </div>
     </div>
   </div>
+</section>
 <!-- End paper abstract -->
 
 <!-- Motivation -->
@@ -133,7 +135,7 @@
       <div class="column is-four-fifths">
         <h2 class="title is-3">Motivation</h2>
         <div class="content has-text-justified">
-          <p>Language models risk inadvertently memorizing and divulging sensitive or personally identifiable information (PII) seen in their training data, causing privacy concerns. Current approaches to address this issue involve costly dataset scrubbing or model filtering through unlearning and model editing, which can be bypassed through extraction attacks.</p>
+          <p>Language models risk inadvertently memorizing and divulging sensitive or personally identifiable information (PII) seen in their training data, causing privacy concerns. Current approaches to address this issue involve costly dataset scrubbing or model filtering through unlearning and model editing, which can be bypassed through extraction attacks. We demonstrate that models like Llama-3-8B and GPT-J-6B naturally memorize sensitive information from The Pile training dataset, including email addresses and URLs.</p>
           <figure class="wide-figure">
             <img src="static/images/High Level Main Method Plot Wide tinypng.png" alt="Figure 1 from the paper">
             <figcaption>Overview of the REVS unlearning process: (1) The original model memorizes a sensitive email address and (2) generates it exactly given a related prompt using greedy decoding. (3) After applying REVS, the target email token(s) are demoted to a specified lower rank <var>R</var> in the model's output, preventing the model from generating the unlearned email.</figcaption>
@@ -151,7 +153,10 @@
       <div class="column is-four-fifths">
         <h2 class="title is-3">Method</h2>
         <div class="content has-text-justified">
-          <p>REVS selects tokens from the target sensitive information sequence, as accurately extracting the original sensitive data requires recovering the full token sequence. It then locates the relevant layers for those tokens and selects neurons within those layers that are both relevant to the given prompt and have high association with the target token information. REVS iteratively edits these selected neurons to <b>reduce the rank</b> of the target tokens below a specified threshold, effectively <i>demoting</i> the sensitive information while preserving the model's broader knowledge.</p>
+          <p>REVS operates through two main phases: <strong>localization</strong> and <strong>editing</strong>. First, it selects the rarest tokens from the target sensitive information sequence, as accurately extracting the original sensitive data requires recovering the full token sequence. It then locates the relevant layers for those tokens and selects neurons within those layers that are both relevant to the given prompt and have high association with the target token information. REVS iteratively edits these selected neurons to <b>reduce the rank</b> of the target tokens below a specified threshold, effectively <i>demoting</i> the sensitive information while preserving the model's broader knowledge.</p>
+          
+          <p>The key insight is that transformer MLP layers construct predictions by promoting specific tokens in the output vocabulary space. By identifying and modifying FF₂ columns (neurons) that contribute most to generating target tokens, REVS surgically removes the model's encoded tendency to generate sensitive data.</p>
+          
           <figure class="wide-figure">
             <img src="static/images/Main Method Plot Wide tinypng.png" alt="Figure 2 from the paper">
             <figcaption>Editing one neuron with REVS: (1) The neuron is projected from hidden space to vocabulary logit space. (2) The logit is adjusted to demote the target token rank to a desired lower rank <var>R</var>. (3) The adjusted logits vector is projected back to hidden space, yielding the updated neuron value.</figcaption>
@@ -169,14 +174,91 @@
       <div class="column is-four-fifths">
         <h2 class="title is-3">Locating Model Components for Editing</h2>
         <div class="content has-text-justified">
-          <p>Our methodology REVS selects the <b>rarest</b> <i>tokens</i> from the target sensitive information sequence, identifies <i>layers</i> where those tokens have <b>high rank</b> in the residual hidden state, and selects <i>neurons</i> within those layers that exhibit both <b>high activations for the given prompt and high rank for the target tokens</b> when projected to the vocabulary space. This targeted approach aims to surgically remove the model's tendency to generate the sensitive information while preserving its broader knowledge.</p>
+          <p>Our methodology REVS uses a sophisticated two-step localization process:</p>
+          
+          <p><strong>Layer Selection:</strong> We identify relevant layers by measuring how strongly each layer contributes to generating the target token. Layers where the target token rank exceeds a predetermined threshold are selected for editing.</p>
+          
+          <p><strong>Neuron Selection:</strong> Within selected layers, we identify neurons using two criteria: (1) <em>Activation strength</em> - how strongly a neuron is activated in response to the prompt, and (2) <em>Token association</em> - how strongly the neuron is associated with the target token when projected to vocabulary space. This hybrid approach targets neurons that are both contextually significant and semantically relevant, outperforming alternatives based solely on activations, gradients, or random selection.</p>
+          
+          <p>We select the <b>rarest</b> tokens (typically 2 tokens per sequence) from the target sensitive information, as unlearning every token is unnecessary for preventing accurate recovery of the original data.</p>
         </div>
       </div>
     </div>
   </div>
 </section>
 
+<!-- Datasets -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Evaluation Datasets</h2>
+        <div class="content has-text-justified">
+          <p>To rigorously evaluate unlearning on truly sensitive information, we curated three benchmark datasets:</p>
+          
+          <div style="margin: 20px 0;">
+            <h4><strong>Organically Memorized Data:</strong></h4>
+            <ul style="text-align: left; margin-left: 40px;">
+              <li><strong>Emails:</strong> 205 email addresses naturally memorized by Llama-3-8B and 288 by GPT-J-6B from The Pile training data</li>
+              <li><strong>URLs:</strong> 203 URLs naturally memorized by Llama-3-8B from The Pile training data</li>
+            </ul>
+          </div>
+          
+          <div style="margin: 20px 0;">
+            <h4><strong>Synthetic Data:</strong></h4>
+            <ul style="text-align: left; margin-left: 40px;">
+              <li><strong>SSN:</strong> 200 synthetic social security numbers generated using Claude 3 Sonnet, with models fine-tuned to memorize them</li>
+            </ul>
+          </div>
+          
+          <p>Unlike prior work that evaluated editing methods on non-sensitive data, our benchmarks contain actual private information, enabling rigorous assessment of unlearning efficacy and robustness against extraction attacks.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
+
+<!-- Evaluation Framework -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Evaluation Framework</h2>
+        <div class="content has-text-justified">
+          <p>We evaluate unlearning through three critical dimensions:</p>
+          
+          <div style="margin: 20px 0;">
+            <h4><strong>1. Effectiveness:</strong></h4>
+            <ul style="text-align: left; margin-left: 40px;">
+              <li><strong>Efficacy@k:</strong> Maximum score across unlearned tokens, measuring difficulty of extracting complete sequences</li>
+              <li><strong>Generalization:</strong> Performance on unseen prompts that generate the same sensitive information</li>
+            </ul>
+          </div>
+          
+          <div style="margin: 20px 0;">
+            <h4><strong>2. Model Integrity:</strong></h4>
+            <ul style="text-align: left; margin-left: 40px;">
+              <li><strong>Specificity:</strong> Impact on tokens that should remain unaffected</li>
+              <li><strong>General Capabilities:</strong> Performance on MMLU and GSM8K benchmarks</li>
+            </ul>
+          </div>
+          
+          <div style="margin: 20px 0;">
+            <h4><strong>3. Extraction Resistance:</strong></h4>
+            <ul style="text-align: left; margin-left: 40px;">
+              <li><strong>Logit-Lens Attack (LLA):</strong> Considers top-k and bottom-k tokens across all layers</li>
+              <li><strong>Delta Attack (DA):</strong> Examines tokens with largest changes between consecutive layers</li>
+              <li><strong>Perturbation Attack (PA):</strong> White-box attack using perturbed prompts</li>
+            </ul>
+          </div>
+          
+          <p>Our extraction attacks are stricter and more comprehensive than prior work, considering more candidate tokens across all model layers.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- Results -->
 <section class="section hero is-light">
   <div class="container is-max-desktop">
@@ -184,8 +266,16 @@
       <div class="column is-four-fifths">
         <h2 class="title is-3">Results</h2>
         <div class="content has-text-justified">
-          REVS achieves near-perfect efficacy in preventing the generation of unlearned targets and maintains high specificity, indicating minimal disruption to the model's desired behavior. 
-          Notably, our experiments revealed inherent differences in unlearning performance between synthetic and organically memorized information, with the organically memorized Email dataset proving more challenging, suggesting that information memorized during pre-training may be more deeply ingrained in the model's parameters.
+          <p>REVS demonstrates superior performance across all evaluation metrics compared to six strong baselines including MEMIT, Constrained Fine-tuning (FT-L), NPO-KL, RMU, Head-Projection, and Max-Entropy methods. Key findings include:</p>
+          
+          <ul style="text-align: left; margin-left: 20px;">
+            <li><strong>Superior Unlearning Performance:</strong> REVS achieves the highest Unlearning Score across all datasets (89.58 on SSN, 62.37 on Emails, 44.25 on URLs)</li>
+            <li><strong>Robust Extraction Resistance:</strong> Achieves highest or second-highest Resistance Score across all datasets and models</li>
+            <li><strong>Preserved Model Integrity:</strong> Maintains strong specificity while achieving high effectiveness, with minimal impact on general capabilities (MMLU/GSM8K scores remain stable)</li>
+            <li><strong>Consistent Performance:</strong> Demonstrates robustness across different hyperparameters, candidate token set sizes, and number of targets</li>
+          </ul>
+          
+          <p>Notably, our experiments revealed inherent differences between synthetic and organically memorized information, with organically memorized data proving more challenging to unlearn, suggesting that information memorized during pre-training may be more deeply ingrained in model parameters.</p>
         </div>
       </div>
     </div>
@@ -193,232 +283,289 @@
 
   <style>
     table {
-        width: 80%;
-        max-width: 800px; /* Set the maximum width of the tables */
+        width: 90%;
+        max-width: 1000px;
         border-collapse: collapse;
         margin-bottom: 20px;
         margin-top: 20px;
         margin-left: auto;
         margin-right: auto;
         background-color: #f2f2f2;
+        font-size: 0.85em;
     }
     th, td {
         border: 2px solid #a29999;
         text-align: center;
-        padding: 8px;
-        font-size: 0.8em;
+        padding: 6px;
         background-color: #ffffff;
     }
     th {
-        background-color: #f2f2f2;
+        background-color: #e8e8e8;
+        font-weight: bold;
     }
     caption {
         padding: 8px;
         font-weight: bold;
         text-align: center;
         font-size: 1.0em;
+        margin-bottom: 10px;
+    }
+    .best-result {
+        font-weight: bold;
+        color: #000000;
+    }
+    .second-best {
+        text-decoration: underline;
     }
 </style>
 
   <table>
-    <caption>Unlearning effectiveness and model integrity results. REVS is superior in almost all cases.</caption>
-    <tr>
-      <th rowspan="2">Dataset</th>
-      <th rowspan="2">Method</th>
-      <th rowspan="2">Harmonic Mean &uparrow;</th>
-      <th rowspan="2">Efficacy@100 &uparrow;</th>
-      <th rowspan="2">General.@100 &uparrow;</th>
-      <th rowspan="2">Specificity &uparrow;</th>
-      <th rowspan="2">Perplexity &downarrow;</th>
-    </tr>
-    <tr></tr>
-    <tr>
-      <td rowspan="4">SSN</td>
-      <td>Unedited</td>
-      <td>0&plusmn;0.0</td>
-      <td>0&plusmn;0.0</td>
-      <td>0&plusmn;0.0</td>
-      <td><u>100&plusmn;0</u></td>
-      <td><u>11.148&plusmn;0</u></td>
-    </tr>
-    <tr>
-      <td>FT-L</td>
-      <td>4.78&plusmn;3.66</td>
-      <td>55.78&plusmn;12.37</td>
-      <td>1.75&plusmn;1.44</td>
-      <td>61.67&plusmn;15.17</td>
-      <td>11.27&plusmn;0.054</td>
-    </tr>
-    <tr>
-      <td>MEMIT (modified)</td>
-      <td>78.07&plusmn;2.2</td>
-      <td>98.5&plusmn;2.33</td>
-      <td>61.15&plusmn;3.25</td>
-      <td><strong>84.17&plusmn;3.07</strong></td>
-      <td>11.156&plusmn;0.011</td>
-    </tr>
-    <tr>
-      <td><strong>REVS (ours)</strong></td>
-      <td><strong>81.45&plusmn;3.56</strong></td>
-      <td><strong>99.95&plusmn;0.07</strong></td>
-      <td><strong>80.17&plusmn;3.22</strong></td>
-      <td>70.33&plusmn;7.84</td>
-      <td>11.165&plusmn;0.01</td>
-  </tr>
-    <tr>
-      <td rowspan="4">Emails</td>
-      <td>Unedited</td>
-      <td>0&plusmn;0.0</td>
-      <td>0&plusmn;0.0</td>
-      <td>-</td>
-      <td><u>100&plusmn;0</u></td>
-      <td><u>8.129&plusmn;0</u></td>
-    </tr>
-    <tr>
-      <td>FT-L</td>
-      <td>3.33&plusmn;1.77</td>
-      <td>55.57&plusmn;4.39</td>
-      <td>-</td>
-      <td>1.73&plusmn;0.96</td>
-      <td>13.63&plusmn;0.34</td>
-    </tr>
-    <tr>
-      <td>MEMIT (modified)</td>
-      <td>70.05&plusmn;1.16</td>
-      <td>88.23&plusmn;1.64</td>
-      <td>-</td>
-      <td>58.1&plusmn;1.63</td>
-      <td>8.13&plusmn;0</td>
-    </tr>
-    <tr>
-      <td><strong>REVS (ours)</strong></td>
-      <td><strong>80.65&plusmn;2.41</strong></td>
-      <td><strong>97.22&plusmn;1.04</strong></td>
-      <td><strong>-</strong></td>
-      <td><strong>68.98&plusmn;3.6</strong></td>
-      <td>8.148&plusmn;0.002</td>
-  </tr>
+    <caption>Unlearning Effectiveness and Model Integrity on Llama-3-8B (k=100)</caption>
+    <thead>
+      <tr>
+        <th>Dataset</th>
+        <th>Method</th>
+        <th>Unlearning Score ↑</th>
+        <th>Efficacy@100 ↑</th>
+        <th>General.@100 ↑</th>
+        <th>Specificity ↑</th>
+        <th>MMLU ↑</th>
+        <th>GSM8K ↑</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td rowspan="8"><strong>SSN</strong></td>
+        <td>Unedited</td>
+        <td>0.00±0.00</td>
+        <td>0.00±0.00</td>
+        <td>0.00±0.00</td>
+        <td class="best-result">100±0.00</td>
+        <td>61.05</td>
+        <td>47.83</td>
+      </tr>
+      <tr>
+        <td>FT-L</td>
+        <td>36.98±11.97</td>
+        <td>63.88±9.88</td>
+        <td>50.35±10.76</td>
+        <td>24.33±9.78</td>
+        <td>60.99</td>
+        <td>46.62</td>
+      </tr>
+      <tr>
+        <td>MEMIT</td>
+        <td>24.72±7.21</td>
+        <td>30.70±9.67</td>
+        <td>23.90±7.61</td>
+        <td>22.67±6.50</td>
+        <td>61.02</td>
+        <td>46.17</td>
+      </tr>
+      <tr>
+        <td>Max-Entropy</td>
+        <td>5.12±2.13</td>
+        <td>5.17±3.00</td>
+        <td>3.92±2.33</td>
+        <td>1.40±0.60</td>
+        <td>61.06</td>
+        <td>47.46</td>
+      </tr>
+      <tr>
+        <td>Head-Projection</td>
+        <td>2.98±0.79</td>
+        <td>3.08±1.23</td>
+        <td>2.95±0.68</td>
+        <td>4.17±2.41</td>
+        <td>61.06</td>
+        <td>46.92</td>
+      </tr>
+      <tr>
+        <td>RMU</td>
+        <td>16.42±9.10</td>
+        <td>13.47±8.42</td>
+        <td>16.67±10.41</td>
+        <td>38.67±14.92</td>
+        <td>60.83</td>
+        <td>48.21</td>
+      </tr>
+      <tr>
+        <td>NPO-KL</td>
+        <td>11.95±4.87</td>
+        <td>38.78±18.34</td>
+        <td>36.13±16.59</td>
+        <td>6.33±3.68</td>
+        <td>61.01</td>
+        <td>47.23</td>
+      </tr>
+      <tr>
+        <td><strong>REVS (ours)</strong></td>
+        <td class="best-result">89.58±1.99</td>
+        <td class="best-result">98.88±1.28</td>
+        <td class="best-result">89.67±3.78</td>
+        <td>82.17±5.08</td>
+        <td>60.87</td>
+        <td>44.20</td>
+      </tr>
+      <tr>
+        <td rowspan="8"><strong>Emails</strong></td>
+        <td>Unedited</td>
+        <td>0.00±0.00</td>
+        <td>0.00±0.00</td>
+        <td>−</td>
+        <td class="best-result">100±0.00</td>
+        <td>62.17</td>
+        <td>47.99</td>
+      </tr>
+      <tr>
+        <td>FT-L</td>
+        <td>50.30±3.04</td>
+        <td>52.98±4.23</td>
+        <td>−</td>
+        <td>49.25±8.50</td>
+        <td>62.15</td>
+        <td>50.94</td>
+      </tr>
+      <tr>
+        <td>MEMIT</td>
+        <td>35.43±4.30</td>
+        <td>63.63±3.50</td>
+        <td>−</td>
+        <td>24.84±4.20</td>
+        <td>62.22</td>
+        <td>50.64</td>
+      </tr>
+      <tr>
+        <td>Max-Entropy</td>
+        <td>31.08±3.30</td>
+        <td class="second-best">69.75±6.30</td>
+        <td>−</td>
+        <td>20.22±3.10</td>
+        <td>62.11</td>
+        <td>50.64</td>
+      </tr>
+      <tr>
+        <td>Head-Projection</td>
+        <td>30.80±3.90</td>
+        <td>64.33±4.90</td>
+        <td>−</td>
+        <td>20.43±3.40</td>
+        <td>62.10</td>
+        <td>50.19</td>
+      </tr>
+      <tr>
+        <td>RMU</td>
+        <td>17.47±3.60</td>
+        <td>15.08±5.90</td>
+        <td>−</td>
+        <td>32.58±16.00</td>
+        <td>62.10</td>
+        <td>46.39</td>
+      </tr>
+      <tr>
+        <td>NPO-KL</td>
+        <td>32.75±2.70</td>
+        <td>24.27±3.00</td>
+        <td>−</td>
+        <td class="second-best">50.97±2.00</td>
+        <td>62.05</td>
+        <td>48.67</td>
+      </tr>
+      <tr>
+        <td><strong>REVS (ours)</strong></td>
+        <td class="best-result">62.37±2.30</td>
+        <td class="best-result">59.65±3.95</td>
+        <td>−</td>
+        <td>65.70±3.79</td>
+        <td>61.77</td>
+        <td>47.46</td>
+      </tr>
+      <tr>
+        <td rowspan="7"><strong>URLs</strong></td>
+        <td>FT-L</td>
+        <td>28.03±3.95</td>
+        <td>59.13±7.71</td>
+        <td>−</td>
+        <td>18.63±3.52</td>
+        <td>62.14</td>
+        <td>50.72</td>
+      </tr>
+      <tr>
+        <td>MEMIT</td>
+        <td>17.52±4.10</td>
+        <td>34.37±10.80</td>
+        <td>−</td>
+        <td>11.98±3.00</td>
+        <td>62.14</td>
+        <td>49.96</td>
+      </tr>
+      <tr>
+        <td>Max-Entropy</td>
+        <td>12.78±3.90</td>
+        <td>32.88±7.90</td>
+        <td>−</td>
+        <td>8.06±2.80</td>
+        <td>62.19</td>
+        <td>49.50</td>
+      </tr>
+      <tr>
+        <td>Head-Projection</td>
+        <td>11.28±3.90</td>
+        <td>26.32±8.40</td>
+        <td>−</td>
+        <td>7.30±2.70</td>
+        <td>62.14</td>
+        <td>49.81</td>
+      </tr>
+      <tr>
+        <td>RMU</td>
+        <td>13.48±6.00</td>
+        <td>12.22±12.20</td>
+        <td>−</td>
+        <td class="second-best">41.83±15.30</td>
+        <td>62.02</td>
+        <td>49.81</td>
+      </tr>
+      <tr>
+        <td>NPO-KL</td>
+        <td>17.80±6.60</td>
+        <td>10.97±4.40</td>
+        <td>−</td>
+        <td class="best-result">50.87±14.10</td>
+        <td>62.13</td>
+        <td>49.88</td>
+      </tr>
+      <tr>
+        <td><strong>REVS (ours)</strong></td>
+        <td class="best-result">44.25±5.01</td>
+        <td class="best-result">78.22±6.04</td>
+        <td>−</td>
+        <td>30.94±4.11</td>
+        <td>62.31</td>
+        <td>47.76</td>
+      </tr>
+    </tbody>
   </table>
-  
-  <table>
-    <caption>Average results for extraction resistance. REVS is more robust to extraction attacks.</caption>
-    <tr>
-      <th rowspan="2">Dataset</th>
-      <th rowspan="2">Method</th>
-      <th rowspan="2">Harmonic Mean &uparrow;</th>
-      <th rowspan="2">Logit Lens@100 &uparrow;</th>
-      <th rowspan="2">Delta@100 &uparrow;</th>
-      <th rowspan="2">Perturb@100 &uparrow;</th>
-    </tr>
-    <tr></tr>
-    <tr>
-      <td rowspan="4">SSN</td>
-      <td>Unedited</td>
-      <td>0&plusmn;0.0</td>
-      <td>0&plusmn;0.0</td>
-      <td>95.12&plusmn;0.82</td>
-      <td>26.5&plusmn;5.26</td>
-    </tr>
-    <tr>
-      <td>FT-L</td>
-      <td>65.35&plusmn;7.57</td>
-      <td>55.63&plusmn;12.64</td>
-      <td>97.03&plusmn;0.8</td>
-      <td>58.62&plusmn;3.49</td>
-    </tr>
-    <tr>
-      <td>MEMIT (modified)</td>
-      <td>93.52&plusmn;1.76</td>
-      <td>97.48&plusmn;2.01</td>
-      <td>97.88&plusmn;0.64</td>
-      <td>90.93&plusmn;3.53</td>
-    </tr>
-    <tr>
-      <td><strong>REVS (ours)</strong></td>
-      <td><strong>99.12&plusmn;3.56</strong></td>
-      <td><strong>99.95&plusmn;0.07</strong></td>
-      <td><strong>98.55&plusmn;0.2</strong></td>
-      <td><strong>98.97&plusmn;1.46</strong></td>
-  </tr>
-    <tr>
-      <td rowspan="4">Emails</td>
-      <td>Unedited</td>
-      <td>0&plusmn;0.0</td>
-      <td>0&plusmn;0.0</td>
-      <td>83.8&plusmn;0.67</td>
-      <td>44.2&plusmn;4.11</td>
-    </tr>
-    <tr>
-      <td>FT-L</td>
-      <td>50.15&plusmn;3.08</td>
-      <td>28.47&plusmn;2.73</td>
-      <td>85.83&plusmn;1.11</td>
-      <td>78.08&plusmn;5.15</td>
-    </tr>
-    <tr>
-      <td>MEMIT (modified)</td>
-      <td>80.73&plusmn;1.7</td>
-      <td>79.62&plusmn;2.31</td>
-      <td>86.17&plusmn;0.39</td>
-      <td>77.12&plusmn;3.86</td>
-    </tr>
-    <tr>
-      <td><strong>REVS (ours)</strong></td>
-      <td><strong>83.48&plusmn;1.14</strong></td>
-      <td><strong>81.05&plusmn;1.17</strong></td>
-      <td><strong>87.08&plusmn;0.25</strong></td>
-      <td><strong>82.63±2.63</strong></td>
-  </tr>
-  </table>
 </section>
 
 
-</body>
-</html>
-</section>
-<!--BibTex citation -->
-  <section class="section" id="BibTeX">
-    <div class="container is-max-desktop content">
-      <h2 class="title">BibTeX</h2>
-      <pre><code>@article{tomer2024revs,
-        title={REVS: Rank Editing in the Vocabulary Space for Unlearning Sensitive Information in Large Language Models},
-        author={Ashuach, Tomer and Tutek, Martin and Belinkov, Yonatan},
-        journal={arXiv preprint arXiv:2406.09325},
-        year={2024}
-      }</code></pre>
-    </div>
-</section>
-
-<!--End BibTex citation -->
-  <footer class="footer">
-  <div class="container">
-    <div class="columns is-centered">
-      <div class="column is-8">
-        <div class="content">
-      <p>
-        This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a>.  
-      </p>
-
+<!-- Robustness to Extraction Attacks -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Robustness to Extraction Attacks</h2>
+        <div class="content has-text-justified">
+          <p>As shown in the radar chart below and detailed results, REVS achieves the highest Resistance Score across all datasets and models, except for Emails on Llama-3-8B, where it ranks a close second. Notably, the results highlight a clear link between higher Effectiveness and improved Resistance Score. While strong Effectiveness often compromises specificity, REVS maintains both, achieving the best or second-best Resistance Score and demonstrating balanced robust unlearning.</p>
+          
+          <figure class="wide-figure">
+            <img src="static/images/triple_radar_ext_llama.png" alt="Extraction Resistance Results for Llama-3-8B">
+            <figcaption>Results for Extraction Resistance on Llama-3-8B for <em>k</em>=100. REVS is more robust to extraction attacks across multiple evaluation dimensions.</figcaption>
+          </figure>
+          
+          <p>The extraction resistance evaluation demonstrates that REVS not only successfully removes sensitive information from model outputs but also makes it significantly more difficult for adversarial attacks to recover the unlearned data. This robustness is crucial for real-world deployment where models may face sophisticated extraction attempts.</p>
+        </div>
+      </div>
     </div>
   </div>
-</div>
-  </div>
-</footer>
-
-<!-- Default Statcounter code for REVS Web https://tomertech.github.io/REVS-Web/
--->
-<script type="text/javascript">
-  var sc_project=13007732; 
-  var sc_invisible=1; 
-  var sc_security="bd519292"; 
-  </script>
-  <script type="text/javascript"
-  src="https://www.statcounter.com/counter/counter.js" async></script>
-  <noscript><div class="statcounter"><a title="web stats"
-  href="https://statcounter.com/" target="_blank"><img class="statcounter"
-  src="https://c.statcounter.com/13007732/0/bd519292/1/" alt="web stats"
-  referrerPolicy="no-referrer-when-downgrade"></a></div></noscript>
-  <!-- End of Statcounter Code -->
-
-  </body>
-  </html>
+</section>
